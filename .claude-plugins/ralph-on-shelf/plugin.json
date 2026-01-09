@@ -10,6 +10,10 @@
     "type": "git",
     "url": "https://github.com/HarleyCoops/RalphOnAShelf"
   },
+  "source": "https://github.com/HarleyCoops/RalphOnAShelf",
   "keywords": ["e2b", "sandbox", "autonomous", "agent", "loop"],
-  "license": "MIT"
+  "license": "MIT",
+  "commands": "./commands/",
+  "hooks": "./hooks/",
+  "agents": "./agents/"
 }

@@ -1,0 +1,15 @@
+{
+  "name": "ralph-tools",
+  "owner": {
+    "name": "HarleyCoops"
+  },
+  "plugins": [
+    {
+      "name": "ralph-on-shelf",
+      "source": "./.claude-plugins/ralph-on-shelf",
+      "description": "Autonomous AI agents in E2B sandboxes",
+      "version": "0.1.0",
+      "author": "HarleyCoops"
+    }
+  ]
+}
