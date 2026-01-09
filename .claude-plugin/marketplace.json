@@ -1,0 +1,17 @@
+{
+  "name": "ralph-on-shelf-marketplace",
+  "description": "Autonomous AI agents running in E2B cloud sandboxes with self-referential iteration loops",
+  "owner": {
+    "name": "HarleyCoops",
+    "url": "https://github.com/HarleyCoops"
+  },
+  "plugins": [
+    {
+      "name": "ralph-on-shelf",
+      "source": "./.claude-plugins/ralph-on-shelf",
+      "description": "Launch autonomous Claude Agent SDK loops inside E2B cloud sandboxes. Includes /ros and /cancel-ros commands.",
+      "version": "0.1.0",
+      "keywords": ["e2b", "sandbox", "autonomous", "agent", "loop", "ralph-wiggum"]
+    }
+  ]
+}
