@@ -2,22 +2,24 @@
   "name": "ralph-tools",
   "owner": {
     "name": "HarleyCoops",
-    "email": "chris@example.com"
+    "url": "https://github.com/HarleyCoops"
   },
   "metadata": {
-    "description": "Ralph-On-Shelf autonomous agent tools",
+    "description": "Ralph-On-Shelf: Autonomous AI agents in E2B cloud sandboxes",
     "version": "0.1.0",
-    "pluginRoot": "./.claude-plugins"
+    "pluginRoot": ".claude-plugins"
   },
   "plugins": [
     {
       "name": "ralph-on-shelf",
-      "source": "./ralph-on-shelf",
-      "description": "Autonomous AI agents running in E2B cloud sandboxes with self-referential iteration loops",
+      "source": "ralph-on-shelf",
+      "description": "Autonomous AI agents running in E2B cloud sandboxes with self-referential iteration loops. Launch tasks with /ros and let Claude work autonomously until completion.",
       "version": "0.1.0",
       "author": {
         "name": "HarleyCoops"
-      }
+      },
+      "keywords": ["e2b", "sandbox", "autonomous", "agent", "loop"],
+      "license": "MIT"
     }
   ]
 }

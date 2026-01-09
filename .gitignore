@@ -55,3 +55,10 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# ROS state files (generated at runtime)
+.ros-state.json
+*.local.md
+
+# Output directory
+output/

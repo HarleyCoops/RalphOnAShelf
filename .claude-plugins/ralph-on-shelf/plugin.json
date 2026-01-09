@@ -1,9 +1,15 @@
 {
   "name": "ralph-on-shelf",
   "version": "0.1.0",
-  "description": "Self-referential autonomous agent loop running in E2B sandboxes",
+  "description": "Autonomous AI agents running in E2B cloud sandboxes with self-referential iteration loops",
   "author": {
-    "name": "ClaudeAgentE2B"
+    "name": "HarleyCoops",
+    "url": "https://github.com/HarleyCoops"
   },
-  "commands": "./commands/"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HarleyCoops/RalphOnAShelf"
+  },
+  "keywords": ["e2b", "sandbox", "autonomous", "agent", "loop"],
+  "license": "MIT"
 }
