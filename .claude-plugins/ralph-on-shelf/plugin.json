@@ -1,0 +1,9 @@
+{
+  "name": "ralph-on-shelf",
+  "version": "0.1.0",
+  "description": "Self-referential autonomous agent loop running in E2B sandboxes",
+  "author": "ClaudeAgentE2B",
+  "commands": ["commands/*.md"],
+  "hooks": ["hooks/*.md"],
+  "agents": ["agents/*.md"]
+}

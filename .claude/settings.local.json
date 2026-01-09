@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:e2b.dev)"
+      "WebFetch(domain:e2b.dev)",
+      "Bash(claude plugin install code-simplifier)",
+      "Bash(claude plugin list:*)",
+      "Bash(claude plugin marketplace:*)",
+      "mcp__plugin_playwright_playwright__browser_snapshot",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.slack.dev)",
+      "Bash(findstr:*)",
+      "Bash(python main.py:*)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

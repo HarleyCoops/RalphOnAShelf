@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from claude_agent_sdk import ClaudeAgentOptions, create_sdk_mcp_server, query, tool
 from dotenv import load_dotenv
@@ -9,12 +9,12 @@ from e2b_code_interpreter import Sandbox
 load_dotenv()
 
 # Global sandbox instance
-sandbox: Sandbox = None
+sandbox: Optional[Sandbox] = None
 
-async def get_or_create_sandbox() -> Sandbox:
+def get_or_create_sandbox() -> Sandbox:
     global sandbox
     if sandbox is None:
-        sandbox = await Sandbox.create()
+        sandbox = Sandbox()
     return sandbox
 
 @tool(
@@ -28,14 +28,16 @@ async def execute_python(args: dict[str, Any]) -> dict[str, Any]:
     """Execute Python code in E2B sandbox."""
     code: str = args["code"]
     try:
-        sbx = await get_or_create_sandbox()
-        execution = await sbx.run_code(code)
+        sbx = get_or_create_sandbox()
+        execution = sbx.run_code(code)
 
         outputs = []
         if execution.logs.stdout:
-            outputs.append(f"stdout:\n{execution.logs.stdout}")
+            stdout_text = "".join(execution.logs.stdout)
+            outputs.append(f"stdout:\n{stdout_text}")
         if execution.logs.stderr:
-            outputs.append(f"stderr:\n{execution.logs.stderr}")
+            stderr_text = "".join(execution.logs.stderr)
+            outputs.append(f"stderr:\n{stderr_text}")
         if execution.error:
             outputs.append(f"Error: {execution.error.name}: {execution.error.value}")
 
@@ -81,7 +83,7 @@ async def main() -> None:
                 print(message.result)
     finally:
         if sandbox:
-            await sandbox.close()
+            sandbox.kill()
 
 if __name__ == "__main__":
     asyncio.run(main())

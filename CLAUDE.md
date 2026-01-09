@@ -4,60 +4,91 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This project integrates the Claude Agent SDK with E2B (Execution to Binary) sandboxes to enable secure, isolated Python code execution for AI agents. The core pattern is building custom MCP tools that execute code in E2B cloud sandboxes rather than locally.
+**Ralph-On-Shelf (ROS)** - Autonomous AI agents running in secure E2B cloud sandboxes with self-referential iteration loops.
+
+Key components:
+- **E2B Sandboxes** - Isolated cloud VMs for safe code execution
+- **Ralph Loop** - Self-referential feedback loop that re-feeds prompts until completion
+- **Claude Code Plugin** - `/ros` and `/cancel-ros` commands
 
 ## Commands
 
-### Install Dependencies
+### Development
 ```bash
-pip install -e .              # Install project with dependencies
-pip install -e ".[dev]"       # Install with dev dependencies (pytest, mypy, ruff)
+pip install -e .              # Install project
+pip install -e ".[dev]"       # Install with dev dependencies
 ```
 
-### Run the Agent
+### ROS Commands (in Claude Code)
 ```bash
-python main.py
+/ros "<prompt>" --max-iterations N --completion-promise "TEXT"   # Start loop
+/cancel-ros                                                       # Cancel loop
 ```
 
-### Testing
+### Testing & Linting
 ```bash
-pytest                                    # Run all tests
-pytest tests/unit                         # Run unit tests only
-pytest -m "not integration"               # Skip integration tests
-pytest tests/path/to/test.py::test_name   # Run single test
-```
-
-### Linting & Type Checking
-```bash
-ruff check .          # Lint
-ruff format .         # Format
-mypy src              # Type check
+pytest                        # Run all tests
+ruff check .                  # Lint
+ruff format .                 # Format (line-length: 100)
+mypy src                      # Type check (strict mode)
 ```
 
 ## Architecture
 
-### Core Pattern: Custom E2B Tools for Claude Agent SDK
-
-The project creates MCP (Model Context Protocol) tools that wrap E2B sandbox operations:
-
-1. **Tool Definition** (`@tool` decorator) - Defines name, description, and input schema
-2. **Sandbox Management** - Global or session-scoped `Sandbox` instances
-3. **MCP Server Creation** - `create_sdk_mcp_server()` bundles tools
-4. **Agent Query** - `query()` runs the agent loop with tools available via `mcp_servers` option
-
-### Key Integration Points
-
+### ROS Loop Flow
 ```
-Claude Agent SDK query()
-    → ClaudeAgentOptions(mcp_servers={"e2b-sandbox": server})
-        → Tool handler calls E2B Sandbox API
-            → Code executes in isolated cloud VM
+/ros "task" → Create Sandbox → Work on Task → Stop Hook → Re-feed Prompt → Repeat
+                    ↓                              ↓
+              E2B Cloud VM                  Until COMPLETE or max iterations
 ```
 
-### Tool Naming Convention
+### Key Files
+| File | Purpose |
+|------|---------|
+| `main.py` | Direct E2B sandbox execution |
+| `.claude-plugins/ralph-on-shelf/commands/ros.md` | /ros command definition |
+| `.claude-plugins/ralph-on-shelf/hooks/stop.py` | Stop hook - re-feeds prompt |
+| `.claude-plugins/ralph-on-shelf/lib/sandbox_manager.py` | E2B sandbox utilities |
 
-MCP tools are accessed as `mcp__<server-name>__<tool-name>`:
-- `mcp__e2b-sandbox__execute_python`
+### State File
+ROS tracks loop state in `.claude-plugins/ralph-on-shelf/.ros-state.json`:
+```json
+{
+  "active": true,
+  "prompt": "...",
+  "max_iterations": 10,
+  "current_iteration": 3,
+  "sandbox_id": "...",
+  "completion_promise": "COMPLETE"
+}
+```
+
+## E2B Sandbox Usage
+
+```python
+from e2b_code_interpreter import Sandbox
+
+# Create and use sandbox
+with Sandbox() as sbx:
+    result = sbx.run_code('print("Hello")')
+    stdout = "".join(result.logs.stdout)
+
+    # File operations
+    sbx.files.write("/path/file.txt", content)
+    content = sbx.files.read("/path/file.txt")
+```
+
+### Sandbox Manager (Plugin)
+```python
+from lib.sandbox_manager import execute_python, manager
+
+result = execute_python('print("test")')
+# Returns: {"success": True, "output": "...", "results": [...]}
+
+manager.write_file("/path", content)
+manager.read_file("/path")
+manager.kill()  # Cleanup
+```
 
 ## Environment Variables
 
@@ -67,6 +98,20 @@ Required in `.env`:
 
 ## Key Dependencies
 
-- `claude-agent-sdk` - Agent loop and tool framework
-- `e2b-code-interpreter` - Sandbox code execution
-- `python-dotenv` - Environment variable loading
+- `e2b-code-interpreter` >= 1.0.0 - Sandbox execution
+- `python-dotenv` - Environment loading
+
+Requires Python 3.11+
+
+## Plugin Development
+
+Commands go in `.claude-plugins/ralph-on-shelf/commands/*.md`
+Hooks go in `.claude-plugins/ralph-on-shelf/hooks/*.py`
+Shared code in `.claude-plugins/ralph-on-shelf/lib/`
+
+## Roadmap
+
+- [ ] Ralph Orchestrator - multi-sandbox parallel execution
+- [ ] Sandbox templates
+- [ ] Progress streaming
+- [ ] Checkpoint/resume
