@@ -71,12 +71,12 @@ flowchart TD
     Input --> Init
     Done --> UserInteraction
 
-    classDef user fill:#f5f5f5,stroke:#333,stroke-width:2px;
-    classDef loop fill:#fffde7,stroke:#fbc02d,stroke-width:2px;
-    classDef sandbox fill:#e3f2fd,stroke:#1976d2,stroke-width:2px;
-    classDef action fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
-    classDef hook fill:#ffebee,stroke:#c62828,stroke-width:2px;
-    classDef cycle fill:#fff;
+    classDef user fill:#424242,stroke:#333,stroke-width:2px,color:#fff;
+    classDef loop fill:#ffc107,stroke:#ff8f00,stroke-width:2px,color:#000;
+    classDef sandbox fill:#1976d2,stroke:#0d47a1,stroke-width:2px,color:#fff;
+    classDef action fill:#388e3c,stroke:#1b5e20,stroke-width:2px,color:#fff;
+    classDef hook fill:#d32f2f,stroke:#b71c1c,stroke-width:2px,color:#fff;
+    classDef cycle fill:#f5f5f5,stroke:#bdbdbd,stroke-width:1px;
 
     class Input user;
     class Init,Work,Done action;

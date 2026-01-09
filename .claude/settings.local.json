@@ -13,7 +13,8 @@
       "Bash(python main.py:*)",
       "Bash(python:*)",
       "Bash(pip show:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate"
     ]
   }
 }
