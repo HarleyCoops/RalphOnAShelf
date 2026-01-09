@@ -1,19 +1,100 @@
+<div align="center">
+
 # Ralph-On-Shelf (ROS)
 
+![Ralph On A Shelf](RalphOnAShelf.jpeg)
+
 **Autonomous AI agents running in secure cloud sandboxes**
+
+*"I'm helping!"* — Ralph, probably
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![E2B](https://img.shields.io/badge/sandbox-E2B-orange.svg)](https://e2b.dev)
+[![Claude Code](https://img.shields.io/badge/cli-Claude%20Code-purple.svg)](https://claude.ai/code)
+
+</div>
 
 ---
 
 ## What is Ralph-On-Shelf?
 
-ROS combines two powerful patterns:
+ROS is an autonomous agent framework that combines **secure cloud sandboxes** with a **self-referential iteration loop** — allowing AI to work on complex tasks completely autonomously until completion.
 
-1. **E2B Sandboxes** - Isolated cloud VMs for safe code execution (~150ms startup)
-2. **Ralph Loop** - Self-referential feedback loop for autonomous iteration
+Named after the [Ralph Wiggum agentic pattern](https://ghuntley.com/ralph/), Ralph is now sitting on a shelf watching your code execute safely in isolated E2B cloud environments.
 
-The result: An AI agent that can work on complex tasks autonomously, executing code safely in the cloud, iterating until completion.
+### Core Components
 
-Named after Ralph Wiggum's persistent iteration pattern, but now he's on a shelf watching your code run safely in E2B.
+| Component | Purpose |
+|-----------|---------|
+| **E2B Sandboxes** | Isolated cloud VMs with ~150ms startup for safe code execution |
+| **Ralph Loop** | Self-referential feedback loop that re-prompts until task completion |
+| **Stop Hook** | Intercepts exit attempts and decides whether to continue iterating |
+| **State Persistence** | Sandbox files persist between iterations — Ralph reads his own work |
+
+---
+
+## The Ralph Loop: How Autonomous Iteration Works
+
+The Ralph Loop is a self-referential pattern where the AI agent continuously re-prompts itself until a task is complete. Unlike simple retry mechanisms, this creates true autonomous behavior:
+
+```mermaid
+flowchart TD
+    subgraph UserInteraction [User]
+        Input["/ros 'Your Task...'"]
+    end
+
+    subgraph ROSLoop [Ralph-On-Shelf Loop]
+        direction TB
+        Init["Initialize State & Sandbox"]
+        
+        subgraph Cycle [Iteration Cycle]
+            direction TB
+            Work["1. Claude Works on Task"]
+            Sandbox[("E2B Cloud Sandbox")]
+            Hook["2. Stop Hook Intercepts Exit"]
+            Check{"3. Complete?"}
+            
+            Work <--> Sandbox
+            Work --> Hook
+            Hook --> Check
+        end
+
+        Iterate["Re-feed Prompt + Context"]
+        Done["Final Cleanup & Report"]
+
+        Init --> Work
+        Check -- No --> Iterate
+        Iterate --> Work
+        Check -- Yes --> Done
+    end
+
+    Input --> Init
+    Done --> UserInteraction
+
+    classDef user fill:#f5f5f5,stroke:#333,stroke-width:2px;
+    classDef loop fill:#fffde7,stroke:#fbc02d,stroke-width:2px;
+    classDef sandbox fill:#e3f2fd,stroke:#1976d2,stroke-width:2px;
+    classDef action fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef hook fill:#ffebee,stroke:#c62828,stroke-width:2px;
+    classDef cycle fill:#fff;
+
+    class Input user;
+    class Init,Work,Done action;
+    class Hook hook;
+    class ROSLoop loop;
+    class Sandbox sandbox;
+    class Cycle cycle;
+```
+
+### Why This Works
+
+1. **Self-Referential Context**: Each iteration, Claude reads files it created in previous iterations. It's essentially having a conversation with its past self.
+
+2. **Persistent State**: The E2B sandbox maintains all files, installed packages, and state between iterations. Nothing is lost.
+
+3. **Completion Detection**: The loop only exits when Claude outputs a specific completion promise (default: `"COMPLETE"`) or hits the max iteration safety limit.
+
+4. **Incremental Progress**: Complex tasks get broken down naturally. Build the schema in iteration 1, add endpoints in iteration 2, write tests in iteration 3, etc.
 
 ---
 
@@ -49,51 +130,6 @@ cp .env.example .env
 # Cancel if needed
 /cancel-ros
 ```
-
----
-
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Ralph-On-Shelf Loop                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   /ros "Your task..."                                        │
-│         │                                                    │
-│         ▼                                                    │
-│   ┌─────────────┐     ┌─────────────────────────────────┐   │
-│   │ Create E2B  │────▶│        E2B Cloud Sandbox        │   │
-│   │  Sandbox    │     │  ┌─────────────────────────┐    │   │
-│   └─────────────┘     │  │   Python Runtime        │    │   │
-│         │             │  │   Files & State         │    │   │
-│         ▼             │  │   Isolated Environment  │    │   │
-│   ┌─────────────┐     │  └─────────────────────────┘    │   │
-│   │ Work on     │◀───▶│                                 │   │
-│   │ Task        │     └─────────────────────────────────┘   │
-│   └─────────────┘                                            │
-│         │                                                    │
-│         ▼                                                    │
-│   ┌─────────────┐  No   ┌─────────────┐                     │
-│   │ Complete?   │──────▶│ Stop Hook   │──┐                  │
-│   └─────────────┘       │ Re-feeds    │  │                  │
-│         │ Yes           │ Prompt      │  │                  │
-│         ▼               └─────────────┘  │                  │
-│   ┌─────────────┐              ▲         │                  │
-│   │   Done!     │              └─────────┘                  │
-│   │ Cleanup     │         (Loop continues)                  │
-│   └─────────────┘                                           │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-1. `/ros` creates a state file and spins up an E2B sandbox
-2. Claude works on the task, executing code in the isolated sandbox
-3. When Claude tries to exit, the Stop hook intercepts
-4. If task not complete, the hook re-feeds the prompt for another iteration
-5. Previous work persists in sandbox files - Claude reads its own output
-6. Loop continues until completion promise found or max iterations reached
-7. Sandbox is cleaned up on completion
 
 ---
 
