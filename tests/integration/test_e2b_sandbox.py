@@ -4,6 +4,11 @@ from __future__ import annotations
 import os
 
 import pytest
+import pytest
+
+pytest.importorskip("dotenv")
+pytest.importorskip("e2b_code_interpreter")
+
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
 
@@ -17,7 +22,11 @@ def test_e2b_sandbox_exec() -> None:
 
     sbx: Sandbox | None = None
     try:
-        sbx = Sandbox()
+        sandbox_factory = getattr(Sandbox, "create", None)
+        if callable(sandbox_factory):
+            sbx = sandbox_factory()
+        else:
+            sbx = Sandbox()
         result = sbx.run_code('print("Hello from E2B sandbox!")')
         stdout = "".join(result.logs.stdout or [])
 

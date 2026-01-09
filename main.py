@@ -6,9 +6,13 @@ This runs the agent in the cloud (Linux) with self-referential iteration until c
 import os
 import sys
 import json
+from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
+
+# Workspace directory inside sandbox where all outputs are saved
+SANDBOX_WORKSPACE = "/home/user/workspace"
 
 # Fix Windows console encoding
 if sys.platform == 'win32':
@@ -31,6 +35,11 @@ nest_asyncio.apply()
 os.environ["ANTHROPIC_API_KEY"] = "{api_key}"
 
 from claude_agent_sdk import ClaudeAgentOptions, query
+
+# Workspace directory for all outputs
+WORKSPACE = "/home/user/workspace"
+os.makedirs(WORKSPACE, exist_ok=True)
+os.chdir(WORKSPACE)
 
 # Read previous iteration context if it exists
 previous_context = ""
@@ -58,7 +67,7 @@ ITERATION: {{iteration}} / {{max_iterations}}
 IMPORTANT:
 - You are in a Ralph Wiggum loop - working autonomously until the task is complete
 - Output "{{completion_promise}}" when you have fully completed the task
-- Save important work to files so you can read them in later iterations
+- WORKSPACE: You are in /home/user/workspace - save ALL outputs here (they will be downloaded)
 - You have {{max_iterations - iteration}} iterations remaining
 - Do not use emojis or special characters in your output - keep it plain text
 """
@@ -67,7 +76,7 @@ IMPORTANT:
     options = ClaudeAgentOptions(
         permission_mode="acceptEdits",
         allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-        cwd="/home/user"
+        cwd=WORKSPACE
     )
 
     result_text = ""
@@ -118,12 +127,14 @@ class RalphLoop:
         prompt: str,
         max_iterations: int = 10,
         completion_promise: str = "COMPLETE",
-        timeout: int = 600
+        timeout: int = 600,
+        output_dir: str | None = None
     ):
         self.prompt = prompt
         self.max_iterations = max_iterations
         self.completion_promise = completion_promise
         self.timeout = timeout
+        self.output_dir = output_dir or os.path.join(os.getcwd(), "ralph_output")
         self.current_iteration = 0
         self.sandbox = None
         self.api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -134,7 +145,11 @@ class RalphLoop:
     def _create_sandbox(self):
         """Create and setup the E2B sandbox."""
         print("[ralph] creating sandbox...")
-        self.sandbox = Sandbox(timeout=self.timeout)
+        sandbox_factory = getattr(Sandbox, "create", None)
+        if callable(sandbox_factory):
+            self.sandbox = sandbox_factory(timeout=self.timeout)
+        else:
+            self.sandbox = Sandbox(timeout=self.timeout)
         print(f"[ralph] sandbox: {self.sandbox.sandbox_id}")
 
         # Install dependencies
@@ -146,6 +161,76 @@ print("done")
 """)
         if result.logs.stdout:
             print("".join(result.logs.stdout).strip())
+
+    def _download_workspace(self) -> list[str]:
+        """
+        Download all files from the sandbox workspace to local output_dir.
+
+        Returns:
+            List of downloaded file paths
+        """
+        downloaded = []
+
+        # List all files in workspace recursively
+        result = self.sandbox.run_code(f"""
+import os
+import json
+
+workspace = "{SANDBOX_WORKSPACE}"
+files = []
+for root, dirs, filenames in os.walk(workspace):
+    # Skip hidden directories
+    dirs[:] = [d for d in dirs if not d.startswith('.')]
+    for filename in filenames:
+        if not filename.startswith('.'):
+            full_path = os.path.join(root, filename)
+            rel_path = os.path.relpath(full_path, workspace)
+            files.append(rel_path)
+print(json.dumps(files))
+""")
+
+        if not result.logs.stdout:
+            print("[ralph] no files found in workspace")
+            return downloaded
+
+        try:
+            files = json.loads("".join(result.logs.stdout).strip())
+        except json.JSONDecodeError:
+            print("[ralph] failed to parse file list")
+            return downloaded
+
+        if not files:
+            print("[ralph] workspace is empty")
+            return downloaded
+
+        # Create local output directory
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        print(f"[ralph] downloading {len(files)} file(s) to {self.output_dir}")
+
+        for rel_path in files:
+            remote_path = f"{SANDBOX_WORKSPACE}/{rel_path}"
+            local_path = Path(self.output_dir) / rel_path
+
+            try:
+                # Create subdirectories if needed
+                local_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Download file content
+                content = self.sandbox.files.read(remote_path)
+
+                # Write to local file (handle both text and binary)
+                if isinstance(content, bytes):
+                    local_path.write_bytes(content)
+                else:
+                    local_path.write_text(content, encoding='utf-8')
+
+                downloaded.append(str(local_path))
+                print(f"[ralph] downloaded: {rel_path}")
+
+            except Exception as e:
+                print(f"[ralph] failed to download {rel_path}: {e}")
+
+        return downloaded
 
     def _run_iteration(self) -> tuple[str, bool]:
         """
@@ -193,6 +278,7 @@ print("done")
         print(f"[ralph] completion_signal: {self.completion_promise}")
 
         history = []
+        downloaded_files = []
         status = "max_iterations_reached"
 
         try:
@@ -215,6 +301,11 @@ print("done")
 
                 print(f"[ralph] continuing...")
 
+            # Download all workspace files before cleanup
+            if self.sandbox:
+                print(f"\n[ralph] retrieving workspace files...")
+                downloaded_files = self._download_workspace()
+
         finally:
             if self.sandbox:
                 print(f"[ralph] cleanup: {self.sandbox.sandbox_id}")
@@ -226,7 +317,9 @@ print("done")
             "max_iterations": self.max_iterations,
             "history": history,
             "prompt": self.prompt,
-            "completion_promise": self.completion_promise
+            "completion_promise": self.completion_promise,
+            "output_dir": self.output_dir,
+            "downloaded_files": downloaded_files
         }
 
 
@@ -234,7 +327,8 @@ def launch_ralph(
     prompt: str,
     max_iterations: int = 10,
     completion_promise: str = "COMPLETE",
-    timeout: int = 600
+    timeout: int = 600,
+    output_dir: str | None = None
 ) -> dict:
     """
     Launch a Ralph Wiggum loop.
@@ -244,15 +338,17 @@ def launch_ralph(
         max_iterations: Maximum iterations before stopping (default 10)
         completion_promise: Text that signals task completion (default "COMPLETE")
         timeout: Sandbox timeout in seconds (default 10 minutes)
+        output_dir: Local directory to save workspace files (default: ./ralph_output)
 
     Returns:
-        dict with status, iterations, and output history
+        dict with status, iterations, output history, and downloaded files
     """
     ralph = RalphLoop(
         prompt=prompt,
         max_iterations=max_iterations,
         completion_promise=completion_promise,
-        timeout=timeout
+        timeout=timeout,
+        output_dir=output_dir
     )
     return ralph.run()
 

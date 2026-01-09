@@ -4,6 +4,10 @@ import os
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("dotenv")
+pytest.importorskip("e2b_code_interpreter")
+
 from dotenv import load_dotenv
 
 from main import launch_ralph

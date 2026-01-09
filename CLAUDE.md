@@ -21,9 +21,11 @@ pip install -e ".[dev]"       # Install with dev dependencies
 
 ### ROS Commands (in Claude Code)
 ```bash
-/ros "<prompt>" --max-iterations N --completion-promise "TEXT"   # Start loop
+/ros "<prompt>" --max-iterations N --completion-promise "TEXT" --output-dir "./output"
 /cancel-ros                                                       # Cancel loop
 ```
+
+All files created in the sandbox workspace are automatically downloaded to `--output-dir` (default: `./ralph_output`) when the loop completes.
 
 ### Testing & Linting
 ```bash
@@ -37,9 +39,11 @@ mypy src                      # Type check (strict mode)
 
 ### ROS Loop Flow
 ```
-/ros "task" → Create Sandbox → Work on Task → Stop Hook → Re-feed Prompt → Repeat
-                    ↓                              ↓
-              E2B Cloud VM                  Until COMPLETE or max iterations
+/ros "task" → Create Sandbox → Work in /home/user/workspace → Check Completion → Repeat
+                    ↓                         ↓                        ↓
+              E2B Cloud VM            Files saved here         Until COMPLETE or max iterations
+                                             ↓
+                                    Download to local output_dir
 ```
 
 ### Key Files
@@ -111,7 +115,11 @@ Shared code in `.claude-plugins/ralph-on-shelf/lib/`
 
 ## Roadmap
 
-- [ ] Ralph Orchestrator - multi-sandbox parallel execution
-- [ ] Sandbox templates
-- [ ] Progress streaming
-- [ ] Checkpoint/resume
+- [ ] **Central Wiggum Orchestrator** - A persistent "master" Ralph that stays alive and spawns child E2B sandboxes to perform tasks in parallel. The orchestrator would:
+  - Maintain state across sessions
+  - Dispatch tasks to worker sandboxes
+  - Aggregate results from multiple parallel executions
+  - Enable complex multi-agent workflows
+- [ ] Sandbox templates (pre-configured environments)
+- [ ] Progress streaming (real-time output)
+- [ ] Checkpoint/resume (pause and continue loops)

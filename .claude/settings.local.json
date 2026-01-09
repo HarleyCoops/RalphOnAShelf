@@ -16,7 +16,12 @@
       "Bash(pip install:*)",
       "mcp__plugin_playwright_playwright__browser_navigate",
       "Bash(if not exist \".claude\\\\plugins\" mkdir \".claude\\\\plugins\")",
-      "Bash(claude plugin:*)"
+      "Bash(claude plugin:*)",
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

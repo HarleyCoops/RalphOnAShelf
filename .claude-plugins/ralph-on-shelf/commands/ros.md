@@ -11,6 +11,9 @@ arguments:
   - name: completion-promise
     description: Text that signals successful completion (default COMPLETE)
     required: false
+  - name: output-dir
+    description: Local directory to save workspace files (default ./ralph_output)
+    required: false
 ---
 
 # Ralph-On-Shelf (ROS)
@@ -29,11 +32,16 @@ result = launch_ralph(
     prompt='''{{prompt}}''',
     max_iterations={{max-iterations | default: 10}},
     completion_promise='{{completion-promise | default: COMPLETE}}',
+    output_dir='{{output-dir | default: ralph_output}}',
     timeout=600
 )
 
 print(f'[ralph] final status: {result[\"status\"]}')
 print(f'[ralph] total iterations: {result[\"iterations\"]}/{result[\"max_iterations\"]}')
+if result.get('downloaded_files'):
+    print(f'[ralph] files saved to: {result[\"output_dir\"]}')
+    for f in result['downloaded_files']:
+        print(f'  - {f}')
 "
 ```
 
