@@ -1,89 +1,292 @@
-import asyncio
-from typing import Any, Optional
+"""
+Ralph-On-Shelf: Launch Claude Agent SDK inside E2B cloud sandbox with Ralph Wiggum loop.
 
-from claude_agent_sdk import ClaudeAgentOptions, create_sdk_mcp_server, query, tool
+This runs the agent in the cloud (Linux) with self-referential iteration until completion.
+"""
+import os
+import sys
+import json
+from datetime import datetime
 from dotenv import load_dotenv
 from e2b_code_interpreter import Sandbox
 
-# Load environment variables from .env
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 load_dotenv()
 
-# Global sandbox instance
-sandbox: Optional[Sandbox] = None
 
-def get_or_create_sandbox() -> Sandbox:
-    global sandbox
-    if sandbox is None:
-        sandbox = Sandbox()
-    return sandbox
+# The agent code that runs INSIDE the E2B sandbox
+AGENT_CODE = '''
+import asyncio
+import os
+import json
+import nest_asyncio
 
-@tool(
-    "execute_python",
-    "Execute Python code in a secure isolated sandbox. Use this for data analysis, "
-    "computations, or any code that needs to run safely. The sandbox has pandas, "
-    "numpy, matplotlib, and other common libraries pre-installed.",
-    {"code": str}
-)
-async def execute_python(args: dict[str, Any]) -> dict[str, Any]:
-    """Execute Python code in E2B sandbox."""
-    code: str = args["code"]
+# Allow nested event loops (needed in Jupyter/E2B environment)
+nest_asyncio.apply()
+
+# Set API key in sandbox environment
+os.environ["ANTHROPIC_API_KEY"] = "{api_key}"
+
+from claude_agent_sdk import ClaudeAgentOptions, query
+
+# Read previous iteration context if it exists
+previous_context = ""
+try:
+    with open("/home/user/ralph_state.json", "r") as f:
+        state = json.load(f)
+        if state.get("history"):
+            previous_context = "\\n\\n--- Previous Iteration Results ---\\n"
+            for i, h in enumerate(state["history"][-3:], 1):  # Last 3 iterations
+                previous_context += f"\\nIteration {{i}}:\\n{{h[:500]}}...\\n"
+except:
+    pass
+
+async def run_agent():
+    prompt = """{prompt}"""
+    iteration = {iteration}
+    max_iterations = {max_iterations}
+    completion_promise = "{completion_promise}"
+
+    full_prompt = f"""{{prompt}}
+
+ITERATION: {{iteration}} / {{max_iterations}}
+{{previous_context if previous_context else ""}}
+
+IMPORTANT:
+- You are in a Ralph Wiggum loop - working autonomously until the task is complete
+- Output "{{completion_promise}}" when you have fully completed the task
+- Save important work to files so you can read them in later iterations
+- You have {{max_iterations - iteration}} iterations remaining
+"""
+
+    print(f"[RALPH] Iteration {{iteration}}/{{max_iterations}}")
+    print(f"[RALPH] Awaiting task completion...")
+    print("-" * 40)
+
+    # Configure for AUTONOMOUS execution - accept edits but avoid strict root check
+    options = ClaudeAgentOptions(
+        permission_mode="acceptEdits",
+        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+        cwd="/home/user"
+    )
+
+    result_text = ""
+    async for message in query(
+        prompt=full_prompt,
+        options=options
+    ):
+        if hasattr(message, "result"):
+            result_text = message.result
+            print(result_text)
+        elif hasattr(message, "content"):
+            print(message.content)
+
+    # Save state for next iteration
     try:
-        sbx = get_or_create_sandbox()
-        execution = sbx.run_code(code)
+        try:
+            with open("/home/user/ralph_state.json", "r") as f:
+                state = json.load(f)
+        except:
+            state = {{"history": []}}
 
-        outputs = []
-        if execution.logs.stdout:
-            stdout_text = "".join(execution.logs.stdout)
-            outputs.append(f"stdout:\n{stdout_text}")
-        if execution.logs.stderr:
-            stderr_text = "".join(execution.logs.stderr)
-            outputs.append(f"stderr:\n{stderr_text}")
-        if execution.error:
-            outputs.append(f"Error: {execution.error.name}: {execution.error.value}")
+        state["history"].append(result_text[:1000] if result_text else "No result")
+        state["last_iteration"] = iteration
 
-        for result in execution.results:
-            if hasattr(result, 'text') and result.text:
-                outputs.append(f"Result: {result.text}")
-            if hasattr(result, 'png') and result.png:
-                outputs.append("[Chart generated]")
-
-        return {
-            "content": [{
-                "type": "text",
-                "text": "\n\n".join(outputs) if outputs else "Code executed successfully (no output)"
-            }]
-        }
+        with open("/home/user/ralph_state.json", "w") as f:
+            json.dump(state, f)
     except Exception as e:
+        print(f"[RALPH] Warning: Could not save state: {{e}}")
+
+    # Check for completion
+    if completion_promise in result_text:
+        print(f"\\n[RALPH] *** COMPLETION SIGNAL DETECTED ***")
+
+asyncio.run(run_agent())
+'''
+
+
+class RalphLoop:
+    """
+    Ralph Wiggum Loop: Self-referential agent iteration in E2B sandbox.
+    """
+
+    def __init__(
+        self,
+        prompt: str,
+        max_iterations: int = 10,
+        completion_promise: str = "COMPLETE",
+        timeout: int = 600
+    ):
+        self.prompt = prompt
+        self.max_iterations = max_iterations
+        self.completion_promise = completion_promise
+        self.timeout = timeout
+        self.current_iteration = 0
+        self.sandbox = None
+        self.api_key = os.getenv("ANTHROPIC_API_KEY")
+
+        if not self.api_key:
+            raise ValueError("ANTHROPIC_API_KEY not set in environment")
+
+    def _create_sandbox(self):
+        """Create and setup the E2B sandbox."""
+        print("[RALPH] Creating E2B sandbox...")
+        self.sandbox = Sandbox.create(timeout=self.timeout)
+        print(f"[RALPH] Sandbox created: {self.sandbox.sandbox_id}")
+
+        # Install dependencies
+        print("[RALPH] Installing dependencies...")
+        result = self.sandbox.run_code("""
+import subprocess
+subprocess.run(['pip', 'install', 'claude-agent-sdk', 'nest_asyncio'], capture_output=True)
+print("Dependencies installed!")
+""")
+        if result.logs.stdout:
+            print("".join(result.logs.stdout))
+
+    def _run_iteration(self) -> tuple[str, bool]:
+        """
+        Run a single iteration of the Ralph loop.
+
+        Returns:
+            tuple of (output, is_complete)
+        """
+        self.current_iteration += 1
+
+        agent_code = AGENT_CODE.format(
+            api_key=self.api_key,
+            prompt=self.prompt.replace('"""', '\\"\\"\\"').replace('{', '{{').replace('}', '}}'),
+            iteration=self.current_iteration,
+            max_iterations=self.max_iterations,
+            completion_promise=self.completion_promise
+        )
+
+        result = self.sandbox.run_code(agent_code)
+
+        output = ""
+        if result.logs.stdout:
+            output = "".join(result.logs.stdout)
+            print(output)
+
+        if result.logs.stderr:
+            print(f"STDERR: {''.join(result.logs.stderr)}")
+
+        if result.error:
+            print(f"ERROR: {result.error.name}: {result.error.value}")
+
+        is_complete = self.completion_promise in output
+        return output, is_complete
+
+    def run(self) -> dict:
+        """
+        Run the full Ralph Wiggum loop until completion or max iterations.
+
+        Returns:
+            dict with status, iterations, and output history
+        """
+        print("=" * 60)
+        print("RALPH-ON-SHELF: Starting Autonomous Loop")
+        print("=" * 60)
+        print(f"Prompt: {self.prompt[:100]}...")
+        print(f"Max iterations: {self.max_iterations}")
+        print(f"Completion signal: '{self.completion_promise}'")
+        print("=" * 60)
+        print()
+
+        history = []
+        status = "max_iterations_reached"
+
+        try:
+            self._create_sandbox()
+
+            while self.current_iteration < self.max_iterations:
+                print(f"\n{'='*60}")
+                print(f"ITERATION {self.current_iteration + 1} / {self.max_iterations}")
+                print("=" * 60)
+
+                output, is_complete = self._run_iteration()
+                history.append({
+                    "iteration": self.current_iteration,
+                    "output": output[:2000],  # Truncate for storage
+                    "timestamp": datetime.now().isoformat()
+                })
+
+                if is_complete:
+                    status = "completed"
+                    print(f"\n{'='*60}")
+                    print("TASK COMPLETED!")
+                    print("=" * 60)
+                    break
+
+                print(f"\n[RALPH] Iteration {self.current_iteration} complete. Continuing...")
+
+        finally:
+            if self.sandbox:
+                print(f"\n[RALPH] Cleaning up sandbox {self.sandbox.sandbox_id}...")
+                self.sandbox.kill()
+
         return {
-            "content": [{"type": "text", "text": f"Execution failed: {str(e)}"}]
+            "status": status,
+            "iterations": self.current_iteration,
+            "max_iterations": self.max_iterations,
+            "history": history,
+            "prompt": self.prompt,
+            "completion_promise": self.completion_promise
         }
 
-# Create the MCP server with the E2B tool
-e2b_server = create_sdk_mcp_server(
-    name="e2b-sandbox",
-    version="1.0.0",
-    tools=[execute_python]
-)
 
-async def main() -> None:
-    print("Starting Claude + E2B Agent...")
+def launch_ralph(
+    prompt: str,
+    max_iterations: int = 10,
+    completion_promise: str = "COMPLETE",
+    timeout: int = 600
+) -> dict:
+    """
+    Launch a Ralph Wiggum loop.
 
-    prompt = "Calculate the first 10 prime numbers using Python and explain the result."
+    Args:
+        prompt: The task for the agent to work on
+        max_iterations: Maximum iterations before stopping (default 10)
+        completion_promise: Text that signals task completion (default "COMPLETE")
+        timeout: Sandbox timeout in seconds (default 10 minutes)
 
-    try:
-        async for message in query(
-            prompt=prompt,
-            options=ClaudeAgentOptions(
-                mcp_servers={"e2b-sandbox": e2b_server},
-                allowed_tools=["mcp__e2b-sandbox__execute_python"]
-            )
-        ):
-            if hasattr(message, "result"):
-                print("\n--- Agent Result ---\n")
-                print(message.result)
-    finally:
-        if sandbox:
-            sandbox.kill()
+    Returns:
+        dict with status, iterations, and output history
+    """
+    ralph = RalphLoop(
+        prompt=prompt,
+        max_iterations=max_iterations,
+        completion_promise=completion_promise,
+        timeout=timeout
+    )
+    return ralph.run()
+
+
+def main():
+    """Test the Ralph Wiggum loop."""
+    prompt = """Create a Python script that:
+1. Calculates the first 20 Fibonacci numbers
+2. Saves them to a file called fibonacci.txt
+3. Reads the file back and prints the contents
+
+Output COMPLETE when you have verified the file was created and contains the correct numbers."""
+
+    result = launch_ralph(
+        prompt=prompt,
+        max_iterations=5,
+        completion_promise="COMPLETE"
+    )
+
+    print("\n" + "=" * 60)
+    print("FINAL RESULT")
+    print("=" * 60)
+    print(f"Status: {result['status']}")
+    print(f"Iterations: {result['iterations']} / {result['max_iterations']}")
+    print("=" * 60)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
