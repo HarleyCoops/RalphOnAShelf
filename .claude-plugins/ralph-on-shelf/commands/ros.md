@@ -9,62 +9,34 @@ arguments:
     description: Maximum number of iterations before stopping (default 10)
     required: false
   - name: completion-promise
-    description: Text that signals successful completion
+    description: Text that signals successful completion (default COMPLETE)
     required: false
 ---
 
-# Ralph-On-Shelf (ROS) - Autonomous E2B Agent Loop
+# Ralph-On-Shelf (ROS)
 
-You are starting a **Ralph-On-Shelf** autonomous loop. This creates a self-referential feedback loop where you work on a task inside an E2B sandbox, iterating until completion.
+Launch an autonomous Claude Agent SDK loop inside an E2B cloud sandbox.
 
-## Setup Instructions
+## Execute
 
-1. **Create the ROS state file** at `${CLAUDE_PLUGIN_ROOT}/.ros-state.json`:
+Run the following Python code to start the Ralph loop:
 
-```json
-{
-  "active": true,
-  "prompt": "{{prompt}}",
-  "max_iterations": {{max-iterations | default: 10}},
-  "completion_promise": "{{completion-promise | default: "COMPLETE"}}",
-  "current_iteration": 0,
-  "sandbox_id": null,
-  "started_at": "<current ISO timestamp>",
-  "status": "running"
-}
+```bash
+cd {{cwd}} && python -c "
+from main import launch_ralph
+
+result = launch_ralph(
+    prompt='''{{prompt}}''',
+    max_iterations={{max-iterations | default: 10}},
+    completion_promise='{{completion-promise | default: COMPLETE}}',
+    timeout=600
+)
+
+print(f'[ralph] final status: {result[\"status\"]}')
+print(f'[ralph] total iterations: {result[\"iterations\"]}/{result[\"max_iterations\"]}')
+"
 ```
 
-2. **Spin up an E2B sandbox** using the project's E2B integration:
-   - Use the `execute_python` tool via MCP or direct E2B API
-   - Store the sandbox_id in the state file
-
-3. **Begin working on the task** inside the sandbox:
-   - Read the prompt: `{{prompt}}`
-   - Execute code in the E2B sandbox to accomplish the task
-   - Track progress in files within the sandbox
-
-## Iteration Rules
-
-- Each iteration, increment `current_iteration` in the state file
-- Check if `current_iteration >= max_iterations` - if so, stop and report
-- Check if your output contains the completion promise `{{completion-promise | default: "COMPLETE"}}` - if so, mark complete
-- Otherwise, the Stop hook will re-feed this prompt for the next iteration
-
-## Your Task
-
-**Prompt:** {{prompt}}
-
-**Max Iterations:** {{max-iterations | default: 10}}
-**Completion Signal:** Output `{{completion-promise | default: "COMPLETE"}}` when done
-
-## Working Guidelines
-
-1. **Use the E2B sandbox** for all code execution - it's isolated and safe
-2. **Persist state in files** - write progress to files so you can read them in next iteration
-3. **Be incremental** - each iteration should make measurable progress
-4. **Signal completion** - output the completion promise when the task is done
-5. **Document blockers** - if stuck, document what's blocking in a file
-
-## Begin
-
-Start working on the task now. Create the state file first, then begin executing in the sandbox.
+The agent will run autonomously in the E2B sandbox until:
+- The completion promise appears in the output
+- Max iterations is reached

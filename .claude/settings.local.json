@@ -14,7 +14,9 @@
       "Bash(python:*)",
       "Bash(pip show:*)",
       "Bash(pip install:*)",
-      "mcp__plugin_playwright_playwright__browser_navigate"
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(if not exist \".claude\\\\plugins\" mkdir \".claude\\\\plugins\")",
+      "Bash(claude plugin:*)"
     ]
   }
 }

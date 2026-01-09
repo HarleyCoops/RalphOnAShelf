@@ -60,11 +60,8 @@ IMPORTANT:
 - Output "{{completion_promise}}" when you have fully completed the task
 - Save important work to files so you can read them in later iterations
 - You have {{max_iterations - iteration}} iterations remaining
+- Do not use emojis or special characters in your output - keep it plain text
 """
-
-    print(f"[RALPH] Iteration {{iteration}}/{{max_iterations}}")
-    print(f"[RALPH] Awaiting task completion...")
-    print("-" * 40)
 
     # Configure for AUTONOMOUS execution - accept edits but avoid strict root check
     options = ClaudeAgentOptions(
@@ -80,9 +77,12 @@ IMPORTANT:
     ):
         if hasattr(message, "result"):
             result_text = message.result
-            print(result_text)
+            # result is captured for completion check, already printed via content blocks
         elif hasattr(message, "content"):
-            print(message.content)
+            # Filter to only show TextBlock content, skip tool blocks
+            for block in message.content:
+                if hasattr(block, "text"):
+                    print(block.text)
 
     # Save state for next iteration
     try:
@@ -98,11 +98,11 @@ IMPORTANT:
         with open("/home/user/ralph_state.json", "w") as f:
             json.dump(state, f)
     except Exception as e:
-        print(f"[RALPH] Warning: Could not save state: {{e}}")
+        print(f"[ralph] warning: could not save state: {{e}}")
 
     # Check for completion
     if completion_promise in result_text:
-        print(f"\\n[RALPH] *** COMPLETION SIGNAL DETECTED ***")
+        print(f"\\n[ralph] completion signal detected")
 
 asyncio.run(run_agent())
 '''
@@ -133,19 +133,19 @@ class RalphLoop:
 
     def _create_sandbox(self):
         """Create and setup the E2B sandbox."""
-        print("[RALPH] Creating E2B sandbox...")
-        self.sandbox = Sandbox.create(timeout=self.timeout)
-        print(f"[RALPH] Sandbox created: {self.sandbox.sandbox_id}")
+        print("[ralph] creating sandbox...")
+        self.sandbox = Sandbox(timeout=self.timeout)
+        print(f"[ralph] sandbox: {self.sandbox.sandbox_id}")
 
         # Install dependencies
-        print("[RALPH] Installing dependencies...")
+        print("[ralph] installing dependencies...")
         result = self.sandbox.run_code("""
 import subprocess
 subprocess.run(['pip', 'install', 'claude-agent-sdk', 'nest_asyncio'], capture_output=True)
-print("Dependencies installed!")
+print("done")
 """)
         if result.logs.stdout:
-            print("".join(result.logs.stdout))
+            print("".join(result.logs.stdout).strip())
 
     def _run_iteration(self) -> tuple[str, bool]:
         """
@@ -172,10 +172,10 @@ print("Dependencies installed!")
             print(output)
 
         if result.logs.stderr:
-            print(f"STDERR: {''.join(result.logs.stderr)}")
+            print(f"[ralph] stderr: {''.join(result.logs.stderr)}")
 
         if result.error:
-            print(f"ERROR: {result.error.name}: {result.error.value}")
+            print(f"[ralph] error: {result.error.name}: {result.error.value}")
 
         is_complete = self.completion_promise in output
         return output, is_complete
@@ -187,14 +187,10 @@ print("Dependencies installed!")
         Returns:
             dict with status, iterations, and output history
         """
-        print("=" * 60)
-        print("RALPH-ON-SHELF: Starting Autonomous Loop")
-        print("=" * 60)
-        print(f"Prompt: {self.prompt[:100]}...")
-        print(f"Max iterations: {self.max_iterations}")
-        print(f"Completion signal: '{self.completion_promise}'")
-        print("=" * 60)
-        print()
+        print(f"[ralph] starting loop")
+        print(f"[ralph] prompt: {self.prompt[:80]}...")
+        print(f"[ralph] max_iterations: {self.max_iterations}")
+        print(f"[ralph] completion_signal: {self.completion_promise}")
 
         history = []
         status = "max_iterations_reached"
@@ -203,29 +199,25 @@ print("Dependencies installed!")
             self._create_sandbox()
 
             while self.current_iteration < self.max_iterations:
-                print(f"\n{'='*60}")
-                print(f"ITERATION {self.current_iteration + 1} / {self.max_iterations}")
-                print("=" * 60)
+                print(f"\n[ralph] iteration {self.current_iteration + 1}/{self.max_iterations}")
 
                 output, is_complete = self._run_iteration()
                 history.append({
                     "iteration": self.current_iteration,
-                    "output": output[:2000],  # Truncate for storage
+                    "output": output[:2000],
                     "timestamp": datetime.now().isoformat()
                 })
 
                 if is_complete:
                     status = "completed"
-                    print(f"\n{'='*60}")
-                    print("TASK COMPLETED!")
-                    print("=" * 60)
+                    print(f"\n[ralph] task completed")
                     break
 
-                print(f"\n[RALPH] Iteration {self.current_iteration} complete. Continuing...")
+                print(f"[ralph] continuing...")
 
         finally:
             if self.sandbox:
-                print(f"\n[RALPH] Cleaning up sandbox {self.sandbox.sandbox_id}...")
+                print(f"[ralph] cleanup: {self.sandbox.sandbox_id}")
                 self.sandbox.kill()
 
         return {
@@ -280,12 +272,8 @@ Output COMPLETE when you have verified the file was created and contains the cor
         completion_promise="COMPLETE"
     )
 
-    print("\n" + "=" * 60)
-    print("FINAL RESULT")
-    print("=" * 60)
-    print(f"Status: {result['status']}")
-    print(f"Iterations: {result['iterations']} / {result['max_iterations']}")
-    print("=" * 60)
+    print(f"\n[ralph] result: {result['status']}")
+    print(f"[ralph] iterations: {result['iterations']}/{result['max_iterations']}")
 
 
 if __name__ == "__main__":
