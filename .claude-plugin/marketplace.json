@@ -1,0 +1,23 @@
+{
+  "name": "ralph-tools",
+  "owner": {
+    "name": "HarleyCoops",
+    "email": "chris@example.com"
+  },
+  "metadata": {
+    "description": "Ralph-On-Shelf autonomous agent tools",
+    "version": "0.1.0",
+    "pluginRoot": "./.claude-plugins"
+  },
+  "plugins": [
+    {
+      "name": "ralph-on-shelf",
+      "source": "./ralph-on-shelf",
+      "description": "Autonomous AI agents running in E2B cloud sandboxes with self-referential iteration loops",
+      "version": "0.1.0",
+      "author": {
+        "name": "HarleyCoops"
+      }
+    }
+  ]
+}
