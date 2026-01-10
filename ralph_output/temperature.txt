@@ -1,2 +1,0 @@
-City: Paris, France
-Temperature: Unable to retrieve - no web access permissions

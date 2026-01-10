@@ -24,7 +24,12 @@
       "Bash(git push:*)",
       "Bash(ruff check:*)",
       "Bash(prime --version:*)",
-      "Skill(ralph-loop:ralph-loop)"
+      "Skill(ralph-loop:ralph-loop)",
+      "Bash(prime login:*)",
+      "Bash(prime env list:*)",
+      "Bash(more:*)",
+      "Bash(powershell -Command:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
