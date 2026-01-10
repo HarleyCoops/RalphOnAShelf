@@ -76,12 +76,20 @@ def _has_valid_auth(server: MCPServer) -> tuple[bool, str | None]:
         return False, None
 
     if server.auth_type == "oauth":
-        # OAuth tokens would need to be stored/managed separately
-        # For now, check for a generic token env var
-        token_var = f"MCP_{server.name.upper().replace('-', '_')}_TOKEN"
-        token = os.getenv(token_var)
-        if token:
-            return True, token
+        # Check multiple possible env var patterns for OAuth tokens
+        name_upper = server.name.upper().replace("-", "_")
+        possible_vars = [
+            f"MCP_{name_upper}_TOKEN",  # MCP_GITHUB_TOKEN
+            f"{name_upper}_TOKEN",       # GITHUB_TOKEN
+            f"{name_upper}_API_KEY",     # LINEAR_API_KEY
+            f"{name_upper}_API_TOKEN",   # GITHUB_API_TOKEN
+            f"GH_TOKEN" if server.name == "github" else None,  # Common GitHub alias
+        ]
+        for var in possible_vars:
+            if var:
+                token = os.getenv(var)
+                if token:
+                    return True, token
         return False, None
 
     return False, None
@@ -238,4 +246,4 @@ def auto_select(prompt: str) -> MCPSelection:
             available_auth.append("oauth")
             break
 
-    return select_mcp_servers(prompt, allowed_auth_types=available_auth)
+    return select_mcp_servers(prompt, allowed_auth_types=available_auth, min_score=2)
