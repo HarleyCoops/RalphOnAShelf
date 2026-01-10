@@ -1105,21 +1105,32 @@ print(json.dumps(files))
                 ralph_quotes_json=ralph_quotes_json,
             )
 
-        # Run the full loop inside the sandbox - this blocks until complete
-        result = self.sandbox.run_code(agent_code)
+        # Collect output while streaming to terminal in real-time
+        output_lines = []
 
-        output = ""
-        if result.logs.stdout:
-            output = "".join(result.logs.stdout)
-            print(output)
+        def on_stdout(msg):
+            """Stream stdout to terminal in real-time."""
+            # Handle both string and OutputMessage objects
+            line = str(msg.line) if hasattr(msg, 'line') else str(msg)
+            output_lines.append(line)
+            print(line, end="", flush=True)
 
-        if result.logs.stderr:
-            stderr = "".join(result.logs.stderr)
-            if stderr.strip():
-                print(f"[ralph] stderr: {stderr}")
+        def on_stderr(msg):
+            """Stream stderr to terminal in real-time."""
+            line = str(msg.line) if hasattr(msg, 'line') else str(msg)
+            print(f"\033[91m{line}\033[0m", end="", flush=True)
+
+        # Run the full loop inside the sandbox with streaming output
+        result = self.sandbox.run_code(
+            agent_code,
+            on_stdout=on_stdout,
+            on_stderr=on_stderr,
+        )
+
+        output = "".join(output_lines)
 
         if result.error:
-            print(f"[ralph] error: {result.error.name}: {result.error.value}")
+            print(f"\n[ralph] error: {result.error.name}: {result.error.value}")
 
         return output
 
