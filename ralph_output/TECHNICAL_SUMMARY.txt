@@ -1,0 +1,169 @@
+================================================================================
+RAILROAD-1959-TINKER PROJECT - TECHNICAL SUMMARY
+================================================================================
+
+PROJECT TYPE: Reinforcement Learning from Human Feedback (RLHF)
+DOMAIN: Railroad Safety Procedure Training
+STATUS: Partially Functional (Plateaued Performance)
+
+--------------------------------------------------------------------------------
+RL ALGORITHM IDENTIFICATION
+--------------------------------------------------------------------------------
+
+Algorithm: Importance Sampling Policy Gradient (PPO-family)
+- Loss Function: Importance sampling with advantage weighting
+- Policy Update: LoRA fine-tuning on Qwen3-4B-Instruct-2507
+- KL Constraint: NONE (kl_penalty_coef=0) - MAJOR CONCERN
+- Value Function: Not visible in logs
+- Advantage Estimation: Method unclear
+
+Classification: Online RL / RLHF for LLM alignment
+
+--------------------------------------------------------------------------------
+ENVIRONMENT & GYM MECHANICS
+--------------------------------------------------------------------------------
+
+Environment Type: Text-based safety scenario evaluation
+Observation Space: Railroad safety scenarios (~190 tokens)
+Action Space: Generated safety responses (~85 tokens)
+Episode Structure: Single-turn (question-answer only)
+
+Task Suite:
+- 35+ distinct railroad safety scenarios
+- Tasks organized in series: 101, 101A-C, 102, 102A-B, 103, 103A
+- Evaluation across safety, procedure, terminology dimensions
+
+Reward Function: Multi-component composite
+  1. exact_match (binary) - Currently 0%
+  2. parse_success (binary) - Currently 100%
+  3. procedure (continuous 0-1) - Currently 33.4%
+  4. safety (continuous 0-1) - Currently 33.4%
+  5. terminology (continuous 0-1) - Currently 33.4%
+  6. token_f1 (continuous 0-1) - Currently 33.4%
+
+Final Reward: Mean of all components = 0.3338 (33.38%)
+
+--------------------------------------------------------------------------------
+HYPERPARAMETERS
+--------------------------------------------------------------------------------
+
+Model: Qwen/Qwen3-4B-Instruct-2507
+LoRA Rank: 32
+Learning Rate: 5e-05
+Batch Size: 32
+Group Size: 8
+Temperature: 0.9 (high)
+Max Tokens: 256
+
+Training:
+- Steps Completed: 76
+- Episodes: 48
+- Runtime: 1725 seconds (~29 min)
+- Eval Frequency: Every 20 steps
+
+--------------------------------------------------------------------------------
+CRITICAL TECHNICAL ISSUES
+--------------------------------------------------------------------------------
+
+1. NO KL DIVERGENCE CONSTRAINT
+   - kl_penalty_coef = 0
+   - Policy can drift arbitrarily from base model
+   - Likely causing reward hacking behavior
+   Severity: CRITICAL
+
+2. REWARD PLATEAU AT 33%
+   - All component rewards stuck at ~0.33
+   - No improvement over training
+   - Model not learning effectively
+   Severity: HIGH
+
+3. SINGLE-TURN EPISODES
+   - turns_per_episode = 1
+   - Cannot model multi-turn dialogue or reasoning
+   - Limited scenario complexity
+   Severity: MEDIUM
+
+4. INSUFFICIENT TRAINING
+   - Only 76 steps, 48 episodes
+   - Each task seen 1-2 times only
+   - Far too little data for generalization
+   Severity: HIGH
+
+5. HIGH TEMPERATURE
+   - Temperature = 0.9
+   - Prevents convergence to optimal policy
+   - Should anneal over training
+   Severity: MEDIUM
+
+--------------------------------------------------------------------------------
+PERFORMANCE ANALYSIS
+--------------------------------------------------------------------------------
+
+Model Behavior:
+- Successfully generates valid, parseable text (100% parse success)
+- Zero exact matches with reference answers
+- Uniform 33% score across all safety dimensions
+- Stuck in local optimum - generates plausible-sounding but incorrect responses
+
+Likely Explanation: REWARD HACKING
+The model learned to generate generic safety-sounding text that scores ~33% on
+each metric without actually solving tasks correctly. This is a classic failure
+mode when KL constraint is absent.
+
+Training Dynamics:
+- Stable (no crashes after initial failures)
+- Flat learning curve (no visible improvement)
+- Slow execution (~36 sec/episode)
+
+--------------------------------------------------------------------------------
+TECHNICAL OPINION
+--------------------------------------------------------------------------------
+
+RATING: C+ / B-
+
+STRENGTHS:
++ Well-designed multi-component reward function
++ Appropriate choice of importance sampling algorithm
++ Efficient LoRA fine-tuning approach
++ Good logging and reproducibility
++ Domain-specific task design
+
+WEAKNESSES:
+- Missing KL constraint is a fundamental flaw
+- Reward function being exploited rather than optimized
+- Insufficient training data and steps
+- No evidence of value function or proper advantage estimation
+- Single-turn episodes limit scenario complexity
+- Temperature too high for convergence
+
+DIAGNOSIS:
+The system demonstrates solid understanding of RLHF principles but lacks
+implementation rigor. The absence of KL penalty has allowed the policy to
+drift into a reward-hacking regime where it generates plausible text without
+genuine understanding. The uniform 33% reward (exactly 1/3 of max) across all
+dimensions is a smoking gun for reward exploitation.
+
+PROGNOSIS:
+With proper fixes (add KL penalty, train longer, anneal temperature, implement
+PPO properly), this could become a solid RL system. Current state is a useful
+prototype but not production-ready.
+
+--------------------------------------------------------------------------------
+TOP 3 RECOMMENDATIONS
+--------------------------------------------------------------------------------
+
+1. ADD KL PENALTY: Set kl_penalty_coef = 0.02
+   - Will prevent policy drift and reward hacking
+   - Standard practice in all production RLHF systems
+
+2. TRAIN LONGER: Run for 500-1000 steps minimum
+   - Current 76 steps is grossly insufficient
+   - Need multiple epochs over all tasks
+
+3. IMPLEMENT PROPER PPO: Add value function, GAE, clipping
+   - Current importance sampling is incomplete
+   - Full PPO will stabilize learning dramatically
+
+================================================================================
+END SUMMARY
+================================================================================

@@ -1,0 +1,62 @@
+WEIGHTS & BIASES ACCOUNT QUERY RESULTS
+========================================
+
+ACCOUNT INFORMATION:
+- Username/Entity: christian-cooper-us
+- Email: christian.cooper.us@gmail.com
+
+PROJECTS:
+Total Projects: 27
+
+Project List:
+1. railroad-1959-tinker
+2. dakota-rl-grammar-tinker
+3. dakota-grammar-gym
+4. grpo-algebra-education
+5. grammar-gym
+6. dakota-rl-grammar
+7. stoney-finetuning
+8. nanochat-3d-showcase
+9. nanochat-sft
+10. nanochat-mid
+11. nanochat
+12. nanochat-rl
+13. openai-finetune-Tshimshian_Kitunto
+14. openai-finetune-Tshimshian_Kithatlā
+15. openai-finetune-Haida_Masset
+16. openai-finetune-Haida_Kaigani
+17. openai-finetune-Thlinkit_Skutkwan
+18. stoney-rl
+19. openr1-math-finetuning
+20. qwen-OpenR1math-50.00
+21. qwen-OpenR1math-5.00
+22. qwen-OpenR1math-grpo
+23. qwen1.5B-math-grpo
+24. Fine-tune-DeepSeek-R1-Distill-Llama-8B on Medical COT Dataset_YouTube Walkthrough
+25. Fine-tune-DeepSeek-R1-Distill-Llama-8B on Medical COT Dataset
+26. qwen-math-grpo
+27. TinyZero
+
+RECENT ACTIVITY:
+Total Runs Found: 178 runs across all projects
+
+Last 10 Runs:
+1. pious-feather-3 (railroad-1959-tinker) - finished - 2025-12-02 16:51:46 UTC
+2. fancy-cloud-2 (railroad-1959-tinker) - killed - 2025-12-02 16:09:36 UTC
+3. lyric-deluge-1 (railroad-1959-tinker) - failed - 2025-12-02 16:07:03 UTC
+4. qwen3-4b-dakota (dakota-rl-grammar) - finished - 2025-11-20 16:01:45 UTC
+5. qwen3-4b-dakota (dakota-rl-grammar) - finished - 2025-11-20 15:58:17 UTC
+6. qwen3-4b-dakota (dakota-rl-grammar) - failed - 2025-11-20 15:55:05 UTC
+7. qwen3-30b-dakota (dakota-rl-grammar) - finished - 2025-11-19 17:44:25 UTC
+8. publish-weights (dakota-rl-grammar-tinker) - finished - 2025-11-19 04:04:41 UTC
+9. exalted-bush-45 (dakota-rl-grammar) - finished - 2025-11-19 01:27:17 UTC
+10. eager-spaceship-44 (dakota-rl-grammar) - failed - 2025-11-19 01:22:02 UTC
+
+LAST ACTIVITY TIMESTAMP:
+Most Recent Run: pious-feather-3
+Project: railroad-1959-tinker
+Created: 2025-12-02 16:51:46 UTC
+State: finished
+
+========================================
+Query completed successfully on 2026-01-10

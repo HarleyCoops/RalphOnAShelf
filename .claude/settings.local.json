@@ -21,7 +21,10 @@
       "Bash(dir:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(ruff check:*)",
+      "Bash(prime --version:*)",
+      "Skill(ralph-loop:ralph-loop)"
     ]
   }
 }

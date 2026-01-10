@@ -1,0 +1,203 @@
+from typing import Any, Dict, Iterable, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+from rich.console import Console
+
+console = Console()
+
+
+class DiskConfig(BaseModel):
+    min_count: Optional[int] = Field(None, alias="minCount")
+    default_count: Optional[int] = Field(None, alias="defaultCount")
+    max_count: Optional[int] = Field(None, alias="maxCount")
+    price_per_unit: Optional[float] = Field(None, alias="pricePerUnit")
+    step: Optional[int]
+    default_included_in_price: Optional[bool] = Field(None, alias="defaultIncludedInPrice")
+    additional_info: Optional[str] = Field(None, alias="additionalInfo")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ResourceConfig(BaseModel):
+    min_count: Optional[int] = Field(None, alias="minCount")
+    default_count: Optional[int] = Field(None, alias="defaultCount")
+    max_count: Optional[int] = Field(None, alias="maxCount")
+    price_per_unit: Optional[float] = Field(None, alias="pricePerUnit")
+    step: Optional[int]
+    default_included_in_price: Optional[bool] = Field(None, alias="defaultIncludedInPrice")
+    additional_info: Optional[str] = Field(None, alias="additionalInfo")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class Prices(BaseModel):
+    on_demand: Optional[float] = Field(None, alias="onDemand")
+    community_price: Optional[float] = Field(None, alias="communityPrice")
+    is_variable: Optional[bool] = Field(None, alias="isVariable")
+    currency: Optional[str]
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @property
+    def price(self) -> float:
+        """Returns the price - either on-demand or community price"""
+        if self.community_price is not None:
+            return self.community_price
+        if self.on_demand is not None:
+            return self.on_demand
+        return float("inf")
+
+
+class GPUAvailability(BaseModel):
+    cloud_id: str = Field(..., alias="cloudId")
+    gpu_type: str = Field(..., alias="gpuType")
+    socket: Optional[str]
+    provider: Optional[str]
+    data_center: Optional[str] = Field(None, alias="dataCenter")
+    country: Optional[str]
+    gpu_count: int = Field(..., alias="gpuCount")
+    gpu_memory: int = Field(..., alias="gpuMemory")
+    disk: DiskConfig
+    vcpu: ResourceConfig
+    memory: ResourceConfig
+    internet_speed: Optional[float] = Field(None, alias="internetSpeed")
+    interconnect: Optional[int]
+    interconnect_type: Optional[str] = Field(None, alias="interconnectType")
+    provisioning_time: Optional[int] = Field(None, alias="provisioningTime")
+    stock_status: str = Field(..., alias="stockStatus")
+    security: Optional[str]
+    prices: Prices
+    images: Optional[List[str]]
+    is_spot: Optional[bool] = Field(None, alias="isSpot")
+    prepaid_time: Optional[int] = Field(None, alias="prepaidTime")
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class DiskAvailability(BaseModel):
+    cloud_id: Optional[str] = Field(None, alias="cloudId")
+    provider: Optional[str]
+    data_center: Optional[str] = Field(None, alias="dataCenter")
+    country: Optional[str]
+    region: Optional[str]
+    spec: DiskConfig
+    stock_status: Optional[str] = Field(None, alias="stockStatus")
+    security: Optional[str]
+    is_multinode: Optional[bool] = Field(None, alias="isMultinode")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+DEFAULT_PAGE_SIZE = 100
+
+
+def _normalize_multi_value_option(values: Iterable[str]) -> List[str]:
+    expanded: List[str] = []
+    for value in values:
+        expanded.extend(part.strip() for part in value.split(",") if part.strip())
+    return expanded
+
+
+class AvailabilityClient:
+    def __init__(self, client: Any) -> None:
+        self.client = client
+
+    def _fetch_paginaged(self, url: str, params: Dict[str, Any]) -> List[Any]:
+        page = 1
+        results: List[Any] = []
+        total_count = 1000000000
+        while True:
+            page_params = params.copy()
+            page_params["page"] = page
+            page_params["page_size"] = DEFAULT_PAGE_SIZE
+            try:
+                response = self.client.get(url, params=page_params)
+                total_count = response.get("totalCount", 0)
+                results.extend(response.get("items", []))
+            except Exception as e:
+                console.print(f"Error fetching availability page {page}: {e}")
+                break
+            if len(results) >= total_count:
+                break
+            page += 1
+
+        return results
+
+    def get(
+        self,
+        regions: Optional[List[str]] = None,
+        gpu_count: Optional[int] = None,
+        gpu_type: Optional[str] = None,
+        disks: Optional[List[str]] = None,
+    ) -> Dict[str, List[GPUAvailability]]:
+        """
+        Get both single GPU and cluster availability information.
+
+        Args:
+            regions: Optional list of regions to filter by
+            gpu_count: Optional number of GPUs to filter by
+            gpu_type: Optional GPU type to filter by
+            disks: Optional list of disk IDs used to filter by provider/data center
+
+        Returns:
+            Dictionary mapping GPU types to lists of availability information,
+            combining both single GPU and cluster availability
+        """
+
+        base_params: Dict[str, Any] = {}
+        if regions:
+            normalized_regions = _normalize_multi_value_option(regions)
+            if normalized_regions:
+                base_params["regions"] = normalized_regions
+        if gpu_count:
+            base_params["gpu_count"] = str(gpu_count)
+        if gpu_type:
+            base_params["gpu_type"] = gpu_type
+        if disks:
+            normalized_disks = _normalize_multi_value_option(disks)
+            if normalized_disks:
+                base_params["disks"] = normalized_disks
+
+        gpu_response = self._fetch_paginaged("/availability/gpus", base_params)
+        cluster_response = self._fetch_paginaged("/availability/multi-node", base_params)
+
+        combined: Dict[str, List[GPUAvailability]] = {}
+        for gpu in gpu_response:
+            if gpu["gpuType"] not in combined:
+                combined[gpu["gpuType"]] = []
+            combined[gpu["gpuType"]].append(GPUAvailability.model_validate(gpu))
+
+        for gpu in cluster_response:
+            if gpu["gpuType"] not in combined:
+                combined[gpu["gpuType"]] = []
+            combined[gpu["gpuType"]].append(GPUAvailability.model_validate(gpu))
+
+        return combined
+
+    def get_disks(
+        self,
+        regions: Optional[List[str]] = None,
+        data_center_id: Optional[str] = None,
+        cloud_id: Optional[str] = None,
+    ) -> List[DiskAvailability]:
+        """Retrieve disk availability information."""
+        params: Dict[str, Any] = {}
+        if regions:
+            params["regions"] = _normalize_multi_value_option(regions)
+        if data_center_id:
+            params["data_center_id"] = data_center_id
+        if cloud_id:
+            params["cloud_id"] = cloud_id
+
+        results = self._fetch_paginaged("/availability/disks", params)
+
+        return [DiskAvailability.model_validate(entry) for entry in results]
+
+    def get_available_gpu_types(self) -> List[str]:
+        """Get list of gpu types that are available."""
+        response = self.client.get("/availability/gpu-summary")
+
+        return list(response.keys())
